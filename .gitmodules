@@ -1,0 +1,3 @@
+[submodule "hungarian_algorithm"]
+	path = hungarian_algorithm
+	url = git@github.com:maxhutch/hungarian-algorithm.git
