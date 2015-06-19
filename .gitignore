@@ -1,6 +1,10 @@
 # Byte-compiled / optimized / DLL files
+hungarian_algorithm/__pycache__/
 __pycache__/
 *.py[cod]
+
+# private config file
+conf.py
 
 # C extensions
 *.so
