@@ -5,11 +5,14 @@ import numpy as np
 from hungarian_algorithm.hungarian import *
 from web_io import get_sheet
 from conf import members_url, honors_url, mhu_url, categories_url
+from conf import override_url
 
 honors = get_sheet(honors_url)
 members = get_sheet(members_url) 
 mhus = get_sheet(mhu_url)
 cats = get_sheet(categories_url)
+override = get_sheet(override_url)
+
 
 """ Clean up! """
 shabbat = False
@@ -71,6 +74,17 @@ for j in range(members.shape[0]):
     scores_individual[j,:] *= 3
   elif (this_year - mem['Last Honor'] == 2):
     scores_individual[j,:] *= 2
+  if mem.Name in list(override["Name"]):
+    for k in range(override.shape[0]):
+      if override.iloc[k]["Name"] == mem.Name:
+        over_honor = override.iloc[k]["Honor"]
+        over_service = override.iloc[k]["Service"]
+    for i in range(honors.shape[0]):
+      honor = honors.iloc[i]
+      if honor["Name"] == over_honor and honor["Service"] == over_service:
+        print("Manually assigning {:s} to {:s} at {:s}".format(mem.Name, over_honor, over_service))
+        scores_individual[j,i] = 1000
+
 
 for i in range(mhus.shape[0]):
   mhu = mhus.iloc[i]
