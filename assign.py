@@ -48,10 +48,6 @@ scores_individual = np.zeros((members.shape[0], rank))
 scores_mhu = np.zeros((rank, rank))
 
 this_year = 2015
-board_member = 8
-new_member   = 7
-two_year     = 6
-one_year     = 5
 
 name_to_member = {}
 for j in range(members.shape[0]):
@@ -65,12 +61,16 @@ for j in range(members.shape[0]):
     if honor['Hebrew'] and not mem['Hebrew']:
       continue
     scores_individual[j, i] = 1.
+
+  for cat in cats.columns.values:
+    if mem.Name in list(cats[cat]):
+      scores_individual[j,:] *= float(cats[cat][0])
   if this_year - mem['Joined'] <= 1:
-    scores_individual[j,:] *= new_member
+    scores_individual[j,:] *= float(cats["New Members"][0])
   elif (this_year - mem['Last Honor'] == 3):
-    scores_individual[j,:] *= two_year
+    scores_individual[j,:] *= 3
   elif (this_year - mem['Last Honor'] == 2):
-    scores_individual[j,:] *= one_year
+    scores_individual[j,:] *= 2
 
 for i in range(mhus.shape[0]):
   mhu = mhus.iloc[i]
