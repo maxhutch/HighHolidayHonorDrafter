@@ -35,14 +35,14 @@ print(mhus)
 name_to_mhu = {}
 for i in range(mhus.shape[0]):
   mhu = mhus.iloc[i]
-  for name in list(mhu):
+  for name in list(mhu)[1:]:
     name_to_mhu[name] = i
 i = mhus.shape[0]
 for name in list(members.Name):
   if name in name_to_mhu:
     continue
   name_to_mhu[name] = i
-  mhus = mhus.append(pd.DataFrame([{"Member": name},]),ignore_index=True)
+  mhus = mhus.append(pd.DataFrame([{"Family service" : False, "M1": name},]),ignore_index=True)
   i = i + 1
 print(mhus)
 
@@ -88,7 +88,7 @@ for j in range(members.shape[0]):
 
 for i in range(mhus.shape[0]):
   mhu = mhus.iloc[i]
-  for name in list(mhu):
+  for name in list(mhu)[1:]:
     if pd.isnull(name):
       break
     scores_mhu[i,:] = np.maximum(scores_mhu[i,:], scores_individual[name_to_member[name],:])
@@ -102,14 +102,25 @@ results = hung.get_results()
 # Optimal outcome is the members with the highest maximum score being assigned to the maximal part
 opt_potential = np.sum(np.sort(np.max(scores_mhu, axis=1))[-min(honors.shape[0],mhus.shape[0]):])
 
+assignments = {}
 for res in results:
   if res[1] >= honors.shape[0] or res[0] >= mhus.shape[0]:
     continue
   winner = "No One"; best = 0
-  for name in list(mhus.iloc[res[0]]):
+  for name in list(mhus.iloc[res[0]])[1:]:
     if (not pd.isnull(name)) and scores_individual[name_to_member[name], res[1]] > best:
       winner = name
       best = scores_individual[name_to_member[name], res[1]] 
   print("{:20s} is assigned to {:s} for {:s}".format(winner, honors.iloc[res[1]].Name, honors.iloc[res[1]].Service))
+  assignments[(honors.iloc[res[1]].Name, honors.iloc[res[1]].Service)] = winner
+
 print("Total score is {:f} of {:f}".format(hung.get_total_potential(), opt_potential))
+to_csv = []
+for i in range(honors.shape[0]):
+  honor = honors.iloc[i]
+  to_csv.append((honor.Service, honor.Name, assignments[(honor.Name, honor.Service)] ))
+final = pd.DataFrame(to_csv)
+final.to_csv("./final_assignments.csv")
+  
+  
 
