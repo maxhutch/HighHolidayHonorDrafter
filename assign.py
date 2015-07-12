@@ -10,7 +10,7 @@ from conf import override_url
 honors = get_sheet(honors_url)
 members = get_sheet(members_url) 
 mhus = get_sheet(mhu_url)
-cats = get_sheet(categories_url)
+cats_new = get_sheet(categories_url)
 override = get_sheet(override_url)
 
 
@@ -18,6 +18,7 @@ override = get_sheet(override_url)
 shabbat = False
 members['Tribe'] = members['Tribe'].fillna('Israel')
 honors['Name'] = honors['Name'].fillna("Delete")
+honors['Weight'] = honors['Weight'].fillna(1.0)
 honors = honors[honors.Name != "Delete"]
 honors['Tribe'] = honors['Tribe'].fillna('Israel')
 honors['Hebrew'] = (honors['Type'] == 'Aliyah')
@@ -27,11 +28,19 @@ if shabbat:
 else:
   honors = honors[honors.Shabbat != 'Only']
 
-print(honors)
-print(members)
-print(cats)
-print(cats.columns.values)
-print(mhus)
+cats_d = {}
+for cat in cats_new.columns.values:
+  cats_d[cat] = [cats_new.iloc[0][cat] ,]
+for i in range(1, cats_new.shape[0]):
+  for cat in cats_new.columns.values[1:]:
+    if cats_new.iloc[i][cat] == 1:
+      cats_d[cat].append(cats_new.iloc[i]["Name"])
+max_len = max([len(cats_d[k]) for k in cats_d])
+for k in cats_d:
+  while len(cats_d[k]) < max_len:
+    cats_d[k].append("")
+
+cats = pd.DataFrame(cats_d)
 
 """ Remove overrides """
 assignments = {}
@@ -74,17 +83,20 @@ for j in range(members.shape[0]):
       continue
     if honor['Hebrew'] and not mem['Hebrew']:
       continue
-    scores_individual[j, i] = 1.
+    scores_individual[j, i] = honor["Weight"]
+
+  if (this_year - mem['Last Honor'] == 3):
+    mult = 3
+  elif (this_year - mem['Last Honor'] == 2):
+    mult = 2
+  else:
+    mult = 1.
 
   for cat in cats.columns.values:
     if mem.Name in list(cats[cat]):
-      scores_individual[j,:] *= float(cats[cat][0])
-  if this_year - mem['Joined'] <= 1:
-    scores_individual[j,:] *= float(cats["New Members"][0])
-  elif (this_year - mem['Last Honor'] == 3):
-    scores_individual[j,:] *= 3
-  elif (this_year - mem['Last Honor'] == 2):
-    scores_individual[j,:] *= 2
+      mult = float(cats[cat][0])
+
+  scores_individual[j,:] *= mult
 
 for i in range(mhus.shape[0]):
   mhu = mhus.iloc[i]
