@@ -17,30 +17,43 @@ override = get_sheet(override_url)
 """ Clean up! """
 shabbat = False
 members['Tribe'] = members['Tribe'].fillna('Israel')
+members['Last Honor'] = members['Last Honor'].fillna(2013)
 honors['Name'] = honors['Name'].fillna("Delete")
-honors['Weight'] = honors['Weight'].fillna(1.0)
 honors = honors[honors.Name != "Delete"]
+honors['Weight'] = honors['Weight'].fillna(1.0)
 honors['Tribe'] = honors['Tribe'].fillna('Israel')
 honors['Hebrew'] = (honors['Type'] == 'Aliyah')
 honors['Shabbat'] = honors['Shabbat'].fillna('Any')
+cats_new = cats_new.fillna(0.0)
 if shabbat:
   honors = honors[honors.Shabbat != 'Exclude']
 else:
   honors = honors[honors.Shabbat != 'Only']
 
+cats_new = cats_new.drop("Don't touch", 1)
+cats_new = cats_new.drop("Last honored", 1)
+
 cats_d = {}
+print(cats_new.columns.values)
 for cat in cats_new.columns.values:
+  if cat == 'Name' or cat == 'Last honored':
+    continue
   cats_d[cat] = [cats_new.iloc[0][cat] ,]
-for i in range(1, cats_new.shape[0]):
-  for cat in cats_new.columns.values[1:]:
-    if cats_new.iloc[i][cat] == 1:
+for i in range(2, cats_new.shape[0]):
+  for cat in cats_new.columns.values:
+    if cat == 'Name' or cat == 'Last honored':
+      continue
+    print(cats_new.iloc[i]["Name"], cat, cats_new.iloc[i][cat])
+    if abs(float(cats_new.iloc[i][cat]) - 1.0) < .5:
       cats_d[cat].append(cats_new.iloc[i]["Name"])
 max_len = max([len(cats_d[k]) for k in cats_d])
 for k in cats_d:
   while len(cats_d[k]) < max_len:
     cats_d[k].append("")
-
+print(cats_d["New Members"])
+print(cats_d["Does not come for HH"])
 cats = pd.DataFrame(cats_d)
+print(cats)
 
 """ Remove overrides """
 assignments = {}
@@ -64,7 +77,6 @@ for name in list(members.Name):
   name_to_mhu[name] = i
   mhus = mhus.append(pd.DataFrame([{"Family service" : False, "M1": name},]),ignore_index=True)
   i = i + 1
-print(mhus)
 
 rank = max(honors.shape[0], mhus.shape[0])
 scores_individual = np.zeros((members.shape[0], rank))
@@ -73,6 +85,17 @@ scores_mhu = np.zeros((rank, rank))
 this_year = 2015
 
 name_to_member = {}
+cat_counts = {}
+assigned_counts = {}
+for cat in cats.columns.values:
+  cat_counts[cat] = 0
+  assigned_counts[cat] = 0
+cat_counts["Three year"] = 0
+cat_counts["Two year"] = 0
+assigned_counts["Three year"] = 0
+assigned_counts["Two year"] = 0
+
+print("Scoring {:d} members".format(members.shape[0]))
 for j in range(members.shape[0]):
   i = 0
   mem = members.iloc[j]
@@ -87,14 +110,22 @@ for j in range(members.shape[0]):
 
   if (this_year - mem['Last Honor'] == 3):
     mult = 3
+    cat_counts["Three year"] += 1
   elif (this_year - mem['Last Honor'] == 2):
     mult = 2
+    cat_counts["Two year"] += 1
   else:
     mult = 1.
 
   for cat in cats.columns.values:
     if mem.Name in list(cats[cat]):
-      mult = float(cats[cat][0])
+      cat_counts[cat] = cat_counts[cat] + 1
+      this_mult = float(cats[cat][0])
+      if this_mult == 0:
+        mult = 0
+        break
+      mult = max(this_mult, mult)
+  print("{:s} got mult {:f}".format(mem.Name, mult))
 
   scores_individual[j,:] *= mult
 
@@ -106,8 +137,6 @@ for i in range(mhus.shape[0]):
     if name in name_to_member:
       scores_mhu[i,:] = np.maximum(scores_mhu[i,:], scores_individual[name_to_member[name],:])
 
-print(scores_individual)
-print(scores_mhu)
 hung = Hungarian(scores_mhu, is_profit_matrix=True)
 hung.calculate()
 
@@ -123,10 +152,21 @@ for res in results:
     if (not pd.isnull(name)) and (name in name_to_member) and scores_individual[name_to_member[name], res[1]] > best:
       winner = name
       best = scores_individual[name_to_member[name], res[1]] 
+  for cat in cats.columns.values:
+    if winner in list(cats[cat]):
+      assigned_counts[cat] = assigned_counts[cat] + 1
+  if best == 3:
+    assigned_counts["Three year"] += 1
+  if best == 2:
+    assigned_counts["Two year"] += 1
+
   print("{:20s} is assigned to {:s} for {:s}".format(winner, honors.iloc[res[1]].Name, honors.iloc[res[1]].Service))
   assignments[(honors.iloc[res[1]].Name, honors.iloc[res[1]].Service)] = winner
 
 print("Total score is {:f} of {:f}".format(hung.get_total_potential(), opt_potential))
+for cat in list(cats.columns.values) + ["Three year", "Two year"]:
+  print("{:20s}: {:3d} of {:3d} assigned".format(cat, assigned_counts[cat], cat_counts[cat]))
+
 to_csv = []
 for i in range(honors_all.shape[0]):
   honor = honors_all.iloc[i]
