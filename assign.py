@@ -65,9 +65,13 @@ honors_all = honors.copy()
 for k in range(override.shape[0]):
   assignments[(override.iloc[k]["Honor"], override.iloc[k]["Service"])] = override.iloc[k]["Name"]
   members = members[members["Name"] != override.iloc[k]["Name"]]
+  foo = honors.shape[0]
   honors = honors[
              (honors["Name"] != override.iloc[k]["Honor"])
            | (honors["Service"] != override.iloc[k]["Service"])]
+  foo = foo - honors.shape[0]
+  if foo != 1:
+    print(override.iloc[k]["Honor"], override.iloc[k]["Service"], override.iloc[k]["Name"], foo)
 
 print("Now {:d} members".format(members.shape[0]))
 """ Remove zero-score categories """
@@ -156,6 +160,10 @@ for i in range(mhus.shape[0]):
       break
     if name in name_to_member:
       scores_mhu[i,:] = np.maximum(scores_mhu[i,:], scores_individual[name_to_member[name],:])
+
+  if scores_mhu[i,0] < 3:
+    print(list(mhu)[1])
+
   if not mhu["Family service"]:
     continue
 
@@ -163,7 +171,10 @@ for i in range(mhus.shape[0]):
     honor = honors.iloc[j]
     if honor.Service == "RH1" or honor.Service == "RH2" or honor.Service == "YK - Torah":
       scores_mhu[i,j] = 0.
+  if scores_mhu[i,0] < 3:
+    print(list(mhu)[1])
 
+print(scores_mhu[:,0])
 print("Solving Hungarian for N={:d}".format(rank))
 hung = Hungarian(scores_mhu, is_profit_matrix=True)
 hung.calculate()
@@ -172,12 +183,17 @@ results = hung.get_results()
 # Optimal outcome is the members with the highest maximum score being assigned to the maximal part
 opt_potential = np.sum(np.sort(np.max(scores_mhu, axis=1))[-min(honors.shape[0],mhus.shape[0]):])
 
+from random import randint
+
 for res in results:
   if res[1] >= honors.shape[0] or res[0] >= mhus.shape[0]:
     continue
   winner = "No One"; best = 0
   for name in list(mhus.iloc[res[0]])[1:]:
-    if (not pd.isnull(name)) and (name in name_to_member) and scores_individual[name_to_member[name], res[1]] > best:
+    if pd.isnull(name) or not (name in name_to_member):
+      continue
+    this_score = scores_individual[name_to_member[name], res[1]]
+    if this_score > best or (this_score == best and randint(0,1) == 1):
       winner = name
       best = scores_individual[name_to_member[name], res[1]] 
   for cat in cats.columns.values:
@@ -195,10 +211,18 @@ print("Total score is {:f} of {:f}".format(hung.get_total_potential(), opt_poten
 for cat in list(cats.columns.values) + ["Three year", "Two year"]:
   print("{:20s}: {:3d} of {:3d} assigned".format(cat, assigned_counts[cat], cat_counts[cat]))
 
-to_csv = []
-for i in range(honors_all.shape[0]):
-  honor = honors_all.iloc[i]
-  to_csv.append((honor.Service, honor.Name, assignments[(honor.Name, honor.Service)] ))
-final = pd.DataFrame(to_csv)
+from collections import Counter
+counts = Counter(assignments.values())
+print(counts)
+
+final = honors_all.copy(deep=True)
+final.loc[:,'Assignee'] = pd.Series("None", index=final.index)
+for i in range(final.shape[0]):
+  honor = final.iloc[i:i+1]
+  label = honor.index[0]
+  honor = honor.iloc[0]
+  #print(label, assignments[(honor.Name, honor.Service)])
+  final.loc[label,'Assignee'] = assignments[(honor.Name, honor.Service)]
 final.to_csv("./final_assignments.csv")
+
 
